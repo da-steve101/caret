@@ -1,45 +1,49 @@
 <!--begin.rcode custom_load, results='hide', echo=FALSE, message=FALSE
-    library(caret)
-    library(kernlab)
-    library(class)
-    library(caTools)
-    library(pROC)
-    library(DMwR)
-    library(randomForest)
-    library(reshape2)
-    library(plyr)
-    library(pls)
-    theme1 <- caretTheme()
-    theme1$superpose.symbol$col = c(rgb(1, 0, 0, .4), rgb(0, 0, 1, .4), 
-      rgb(0.3984375, 0.7578125,0.6445312, .6))
-    theme1$superpose.symbol$pch = c(15, 16, 17)
-    theme1$superpose.cex = .8
-    theme1$superpose.line$col = c(rgb(1, 0, 0, .9), rgb(0, 0, 1, .9), rgb(0.3984375, 0.7578125,0.6445312, .6))
-    theme1$superpose.line$lwd <- 2
-    theme1$superpose.line$lty = 1:3
-    theme1$plot.symbol$col = c(rgb(.2, .2, .2, .4))
-    theme1$plot.symbol$pch = 16
-    theme1$plot.cex = .8
-    theme1$plot.line$col = c(rgb(1, 0, 0, .7))
-    theme1$plot.line$lwd <- 2
-    theme1$plot.line$lty = 1
+library(caret)
+library(kernlab)
+library(class)
+library(caTools)
+library(pROC)
+library(DMwR)
+library(randomForest)
+library(reshape2)
+library(plyr)
+library(pls)
+library(parallel)
+library(doMC)
+registerDoMC(cores=detectCores()-1)
 
-    i <- 1
+theme1 <- caretTheme()
+theme1$superpose.symbol$col = c(rgb(1, 0, 0, .4), rgb(0, 0, 1, .4), 
+                                rgb(0.3984375, 0.7578125,0.6445312, .6))
+theme1$superpose.symbol$pch = c(15, 16, 17)
+theme1$superpose.cex = .8
+theme1$superpose.line$col = c(rgb(1, 0, 0, .9), rgb(0, 0, 1, .9), rgb(0.3984375, 0.7578125,0.6445312, .6))
+theme1$superpose.line$lwd <- 2
+theme1$superpose.line$lty = 1:3
+theme1$plot.symbol$col = c(rgb(.2, .2, .2, .4))
+theme1$plot.symbol$pch = 16
+theme1$plot.cex = .8
+theme1$plot.line$col = c(rgb(1, 0, 0, .7))
+theme1$plot.line$lwd <- 2
+theme1$plot.line$lty = 1
 
-    hook_inline = knit_hooks$get('inline')
-    knit_hooks$set(inline = function(x) {
-      if (is.character(x)) highr::hi_html(x) else hook_inline(x)
-      })
-    opts_chunk$set(comment=NA, digits = 4,warning=FALSE,message=FALSE)
+i <- 1
 
-    library(ellipse)
-    library(mlbench)
-    data(Sonar)
-    session <- paste(format(Sys.time(), "%a %b %d %Y"),
-                     "using caret version",
-                     packageDescription("caret")$Version,
-                     "and",
-                     R.Version()$version.string)
+hook_inline = knit_hooks$get('inline')
+knit_hooks$set(inline = function(x) {
+  if (is.character(x)) highr::hi_html(x) else hook_inline(x)
+  })
+opts_chunk$set(comment=NA, digits = 4,warning=FALSE,message=FALSE)
+
+library(ellipse)
+library(mlbench)
+data(Sonar)
+session <- paste(format(Sys.time(), "%a %b %d %Y"),
+                 "using caret version",
+                 packageDescription("caret")$Version,
+                 "and",
+                 R.Version()$version.string)
 #    options(digits=2)
     end.rcode-->
 
@@ -104,7 +108,7 @@ Released   : 20120902
   <a href="#Illustration2">Illustrative Example 2: Something More Complicated - LogitBoost</a>
   </li>
   <li>
-  <a href="#Illustration3">Illustrative Example 3: SMOTE During Resampling</a>  </li>
+  <a href="#Illustration3">Illustrative Example 3: Nonstandard Formulas</a>  </li>
   </li>
   <li>
   <a href="#Illustration4">Illustrative Example 4: PLS Feature Extraction Pre-Processing</a>      
@@ -561,15 +565,13 @@ lbPred <- function(modelFit, newdata, preProc = NULL, submodels = NULL) {
   
   ## In this case, 'submodels' is a data frame with the other values of
   ## nIter. We loop over these to get the other predictions.
-  if(!is.null(submodels))
-    {
+  if(!is.null(submodels)) {
     ## Save _all_ the predictions in a list
     tmp <- out
     out <- vector(mode = "list", length = nrow(submodels) + 1)
     out[[1]] <- tmp
     
-    for(j in seq(along = submodels$nIter))
-      {
+    for(j in seq(along = submodels$nIter)) {
       out[[j+1]] <- caTools::predict.LogitBoost(modelFit,
                                                 newdata,
                                                 nIter = submodels$nIter[j])
@@ -638,6 +640,10 @@ lbFuncs <- list(library = "caTools",
 
 <p>Should you care about this? Let's tune the model over the same data set used for the SVM model above and see how long it takes:
 </p>
+
+<!--begin.rcode custom_reset_workers1, echo=FALSE, results = 'hide'
+registerDoSEQ()
+ end.rcode-->   
 <!--begin.rcode custom_lb_mod, tidy=FALSE
 set.seed(825)
 lb1 <- system.time(train(Class ~ ., data = training, 
@@ -690,65 +696,82 @@ xyplot(SpeedUp ~ nIter,
        ylab = "Speed-Up",
        type = c("p", "g", "r"))
 end.rcode--> 
-
+<!--begin.rcode custom_reset_workers2, echo=FALSE, results = 'hide'
+registerDoMC(cores=detectCores()-1)
+ end.rcode-->  
 <p>
 The speed-ups show a significant decrease in training time using this method.
 </p>
 
 <div id="Illustration3"></div>
-<h1>Illustrative Example 3: SMOTE During Resampling</h1>
+<h1>Illustrative Example 3: Nonstandard Formulas</h1>
 
 <p>
-Other example is related to class imbalances. It might be helpful to sample the data so that  the classes have a more balanced frequency distribution in the training set. One way to do this is the <a href="http://scholar.google.com/scholar?hl=en&q=SMOTE">SMOTE algorithm</a> where the majority class is down-sampled while new instances are imputed in the minority class. To get a good sense of what the performance will be using cross-validation, we should run SMOTE within each resample (instead of once prior to the model training). 
+(Note: the previous third illustration ("SMOTE During Resampling") is no longer needed due to the inl;cudion of subsampling via <span class="mx funCall">train</span>.)
 </p>
 <p>
-To do this, we will only modify the <span class="mx arg">fit</span> function. Suppose we want to fit an LDA model. First, we get the functions, then modify them:
+One limitation of <span class="mx funCall">train</span> is that it requires the use of basic model formulas. There are several functions that use special formulas or operators on predictors that won't  (and perhaps should not) work in the top level call to <span class="mx funCall">train</span>. However, we can still fit these models. 
 </p>
-<!--begin.rcode custom_lda_mod, tidy=FALSE
-ldaInfo <- getModelInfo("lda", regex = FALSE)[[1]]
-ldaInfo$fit
-ldaInfo$fit <- function(x, y, wts, param, lev, last, classProbs, ...) {
-  library(DMwR)
-  tmp <- as.data.frame(x)
-  tmp$Class <- y
-  smoted <- SMOTE(Class ~ ., data = tmp)
-  lda(smoted[, names(smoted) != "Class"], smoted$Class, ...)
-  }
+<p>
+Here is an example using the <span class="mx funCall">mboost</span> function in the <strong>mboost</strong> package from the help page. 
+</p>
+<!--begin.rcode custom_mboost_orig, tidy=FALSE, eval = FALSE
+library(mboost)
+data("bodyfat", package = "TH.data")
+mod <- mboost(DEXfat ~ btree(age) + bols(waistcirc) + bbs(hipcirc),
+              data = bodyfat)
+mod
 end.rcode--> 
 
-<p> We can simulate some data with a class imbalance and test this model and the usual LDA model.</p>
+<p> 
+We can create a custom model that mimics this code so that we can obtain resampling estimates for this specific model:
+</p>
 
-<!--begin.rcode custom_lda_data, tidy=FALSE
-set.seed(1135)
-imbal_train <- twoClassSim(n =  300, intercept = -17)
-imbal_test  <- twoClassSim(n = 2000, intercept = -17)
-table(imbal_train$Class)
+<!--begin.rcode custom_mboost_code, tidy=FALSE
+modelInfo <- list(label = "Model-based Gradient Boosting",
+                  library = "mboost",
+                  type = "Regression",
+                  parameters = data.frame(parameter = "parameter",
+                                          class = "character",
+                                          label = "parameter"),
+                  grid = function(x, y, len = NULL) 
+                    data.frame(parameter = "none"),
+                  loop = NULL,
+                  fit = function(x, y, wts, param, lev, last, classProbs, ...) {          
+                    ## mboost requires a data frame with predictors and response
+                    dat <- if(is.data.frame(x)) x else as.data.frame(x)
+                    dat$DEXfat <- y
+                    mod <- mboost(DEXfat ~ btree(age) + bols(waistcirc) + bbs(hipcirc),
+                                  data = dat)
+                    },
+                  predict = function(modelFit, newdata, submodels = NULL) {
+                    if(!is.data.frame(newdata)) newdata <- as.data.frame(newdata)
+                    ## By default a matrix is returned; we convert it to a vector
+                    predict(modelFit, newdata)[,1]
+                  },
+                  prob = NULL,
+                  predictors = function(x, ...) {
+                    unique(as.vector((variable.names(x)))
+                  },
+                  tags = c("Ensemble Model", "Boosting", "Implicit Feature Selection"),
+                  levels = NULL,
+                  sort = function(x) x)
+
 end.rcode--> 
 
-<!--begin.rcode custom_lda_both, tidy=FALSE
-ldaCtrl <- trainControl(method = "repeatedcv", repeats = 10,
-                        classProbs = TRUE, 
-                        summaryFunction = twoClassSummary)
-set.seed(346)
-ldaFit <- train(Class ~ ., data = imbal_train,
-                method = "lda",
-                metric = "ROC",
-                trControl = ldaCtrl)
-set.seed(346)
-ldaDSFit <- train(Class ~ ., data = imbal_train,
-                  method = ldaInfo,
-                  metric = "ROC",
-                  trControl = ldaCtrl)
-
-ldaProb1 <- predict(ldaFit, imbal_test, type = "prob")[,1]
-ldaProb2 <- predict(ldaDSFit, imbal_test, type = "prob")[,1]
-
-roc(imbal_test$Class, ldaProb1, levels = rev(levels(imbal_test$Class)))
-roc(imbal_test$Class, ldaProb2, levels = rev(levels(imbal_test$Class)))
-
+<!--begin.rcode custom_mboost_cv, tidy=FALSE
+## Just use the basic formula method so that these predictors
+## are passed 'as-is' into the model fitting and prediction
+## functions.
+set.seed(307)
+mboost_resamp <- train(DEXfat ~ age + waistcirc + hipcirc, 
+                       data = bodyfat, 
+                       method = modelInfo,
+                       trControl = trainControl(method = "repeatedcv",
+                                                repeats = 5))
+mboost_resamp
 end.rcode--> 
 
-<p> For these data, SMOTE didn't seem to make much of a difference. </p>
 
 <div id="Illustration4"></div>
 <h1>Illustrative Example 4: PLS Feature Extraction Pre-Processing</h1>
@@ -1077,41 +1100,39 @@ One great thing about this code is that it will automatically apply the optimize
   </div>
   <!-- end #content -->
 <div id="sidebar">
-  <ul>
+<ul>
   <li>
-  <h2>Links</h2>
-  <p><a href="modelList.html"><tt>train</tt> Model List</a></p>
-  </li>
-  <li>
-    <h2>Topics</h2>
+    <h2>General Topics</h2>
     <ul>
-        <li><a href="index.html">Main Page</a></li>
-      <li><a href="datasets.html">Data Sets</a></li>
-        <li><a href="visualizations.html">Visualizations</a></li>
-        <li><a href="preprocess.html">Pre-Processing</a></li>
-        <li><a href="splitting.html">Data Splitting</a></li>
-        <li><a href="misc.html">Miscellaneous Model Functions</a></li>
-        <li><a href="training.html">Model Training and Tuning</a></li>
-        <li><a href="modelList.html"><tt>train</tt> Model List</a></li>
-        <li><a href="bytag.html"><tt>train</tt> Models By Tag</a></li>
-        <li><a href="similarity.html"><tt>train</tt> Models By Similarity</a></li>
-        <li><a href="custom_models.html">Using Custom Models</a></li>
-        <li><a href="varimp.html">Variable Importance</a></li>
-        <li><a href="featureselection.html">Feature Selection</a>
-        <ul>
-          <li><a href="rfe.html">RFE</a></li>
-            <li><a href="filters.html">Filters</a></li>
-            <li><a href="GA.html">GA</a></li>
-            <li><a href="SA.html">SA</a></li>
-        </ul></li>
-        <li><a href="other.html">Other Functions</a></li>
-        <li><a href="parallel.html">Parallel Processing</a></li>
-        <li><a href="adaptive.html">Adaptive Resampling</a></li> 
-  </ul>
+      <li><a href="index.html">Front Page</a></li>
+      <li><a href="visualizations.html">Visualizations</a></li>
+      <li><a href="preprocess.html">Pre-Processing</a><li>
+      <li><a href="splitting.html">Data Splitting</a></li>
+      <li><a href="varimp.html">Variable Importance</a></li>
+      <li><a href="parallel.html">Parallel Processing</a></li>
+    </ul>
+    <h2>Model Training and Tuning</h2>
+    <ul>
+      <li><a href="training.html">Basic Syntax</a></li>
+      <li><a href="modelList.html">Sortable Model List</a></li>
+      <li><a href="bytag.html">Models By Tag</a></li>
+      <li><a href="similarity.html">Models By Similarity</a></li>
+      <li><a href="custom_models.html">Using Custom Models</a></li>
+      <li><a href="sampling.html">Sampling for Class Imbalances</a></li> 
+      <li><a href="adaptive.html">Adaptive Resampling</a></li> 
+    </ul>
+    <h2>Feature Selection</h2>
+    <ul>
+      <li><a href="featureselection.html">Overview</a>
+      <li><a href="rfe.html">RFE</a></li>
+      <li><a href="filters.html">Filters</a></li>
+      <li><a href="GA.html">GA</a></li>
+      <li><a href="SA.html">SA</a></li>
+    </ul>  
   </li>
-  </ul>
-  </div>
-  <!-- end #sidebar -->
+</ul>
+</div>
+<!-- end #sidebar -->
 <div style="clear: both;">&nbsp;</div>
   </div>
   <div class="container"><img src="images/img03.png" width="1000" height="40" alt="" /></div>
