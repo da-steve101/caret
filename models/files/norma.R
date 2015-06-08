@@ -49,7 +49,7 @@ modelInfo <- list(label = "NORMA with Radial Basis Function Kernel",
                     if (length(lev(modelFit)) <= 2) {
                         # two class classification
                         # scale between 0 and 1 with sigmoid, scaling power? use sigma?
-                        out <- apply(as.matrix(out), MARGIN = 2, FUN = function(x) 1/(1 + exp(x)))
+                        out <- apply(as.matrix(out), MARGIN = 2, FUN = function(x) 1/(1 + exp(-x)))
                         out <- data.frame(out)
                         names(out) <- lev(modelFit)[1]
                     }

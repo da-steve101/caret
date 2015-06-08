@@ -229,6 +229,24 @@ twoClassSummary <- function (data, lev = NULL, model = NULL)
   out
 }
 
+twoClassSummaryH <- function (data, lev = NULL, model = NULL)
+{
+  requireNamespaceQuietStop('hmeasure')
+  if (!all(levels(data[, "pred"]) == levels(data[, "obs"])))
+    stop("levels of observed and predicted data do not match")
+  observed <- data$obs
+  levels(observed) <- c(0, 1)
+  hObject <- try(hmeasure::HMeasure(observed, data[, lev[1]]), silent = TRUE)
+  rocAUC <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$AUC
+  rocAUCH <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$AUCH
+  H <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$H
+  out <- c(rocAUC, rocAUCH, H,
+           sensitivity(data[, "pred"], data[, "obs"], lev[1]),
+           specificity(data[, "pred"], data[, "obs"], lev[2]))
+  names(out) <- c("AUC", "AUCH", "H", "Sens", "Spec")
+  out
+}
+
 mnLogLoss <- function(data, lev = NULL, model = NULL){
   if(is.null(lev)) stop("'lev' cannot be NULL")
   if(!all(lev %in% colnames(data)))
