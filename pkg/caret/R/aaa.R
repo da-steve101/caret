@@ -237,7 +237,7 @@ twoClassSummaryH <- function (data, lev = NULL, model = NULL)
     stop("levels of observed and predicted data do not match")
   observed <- data$obs
   levels(observed) <- c(0, 1)
-  hObject <- try(hmeasure::HMeasure(observed, data[, lev[1]]), silent = TRUE)
+  hObject <- try(suppressWarnings(hmeasure::HMeasure(observed, data[, lev[1]])), silent = TRUE)
   rocAUC <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$AUC
   rocAUCH <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$AUCH
   H <- if(class(hObject)[1] == "try-error") NA else hObject$metrics$H
@@ -245,6 +245,18 @@ twoClassSummaryH <- function (data, lev = NULL, model = NULL)
            sensitivity(data[, "pred"], data[, "obs"], lev[1]),
            specificity(data[, "pred"], data[, "obs"], lev[2]))
   names(out) <- c("AUC", "AUCH", "H", "Sens", "Spec")
+  out
+}
+
+regressionSummary <- function (data, lev = NULL, model = NULL)
+{
+  observed <- data$obs
+  predicted <- data$pred
+  diff <- abs(observed - predicted)
+  mae <- sum(diff)
+  mse <- sum(diff^2)
+  out <- c(mse, mae)
+  names(out) <- c("MSE", "MAE")
   out
 }
 

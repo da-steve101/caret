@@ -16,7 +16,10 @@ modelInfo <- list(label = "NORMA with Radial Basis Function Kernel",
                   },
                   loop = NULL,
                   fit = function(x, y, wts, param, lev, last, classProbs, ...) {
-                    if (length(unique(y)) <= 2)
+                    if (length(unique(y)) <= 1)
+                        out <- inlearn(d = dim(x)[2], kernel = "rbfdot", kpar = list(param$sigma),
+                                       type = "novelty", buffersize = param$buffersize)
+                    else if (length(unique(y)) <= 2)
                         out <- inlearn(d = dim(x)[2], kernel = "rbfdot", kpar = list(param$sigma),
                                        type = "classification", buffersize = param$buffersize)
                     else
@@ -46,12 +49,17 @@ modelInfo <- list(label = "NORMA with Radial Basis Function Kernel",
                       pred
                     }
                     out <- try(NORMAPred(modelFit, newdata), silent = FALSE)
-                    if (length(lev(modelFit)) <= 2) {
+                    if (class(out)[1] != "try-error") {
+                      if (length(lev(modelFit)) <= 2) {
                         # two class classification
                         # scale between 0 and 1 with sigmoid, scaling power? use sigma?
                         out <- apply(as.matrix(out), MARGIN = 2, FUN = function(x) 1/(1 + exp(-x)))
-                        out <- data.frame(out)
-                        names(out) <- lev(modelFit)[1]
+                        out <- data.frame(out, 1 - out)
+                        names(out) <- lev(modelFit)
+                      }
+                    } else {
+                        warning("NORMA prediction try error")
+                        out <- matrix(data=NA,nrow=1,ncol=dim(newdata)[2])
                     }
                     out
                   },
