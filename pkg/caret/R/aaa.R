@@ -253,8 +253,8 @@ regressionSummary <- function (data, lev = NULL, model = NULL)
   observed <- data$obs
   predicted <- data$pred
   diff <- abs(observed - predicted)
-  mae <- sum(diff)
-  mse <- sum(diff^2)
+  mae <- sum(diff)/length(diff)
+  mse <- sum(diff^2)/length(diff)
   out <- c(mse, mae)
   names(out) <- c("MSE", "MAE")
   out
