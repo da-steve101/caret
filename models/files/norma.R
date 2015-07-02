@@ -9,7 +9,7 @@ modelInfo <- list(label = "NORMA with Radial Basis Function Kernel",
                         sigmas <- sigest(as.matrix(x), na.action = na.omit, scaled = TRUE)
                         normaGrid<-expand.grid(sigma = mean(as.vector(sigmas[-2]))*(c(1,5,10,50,100)),                                               nu = (1:8)/10, lambda = (1 - 2^(-4:-1)),
                                                eta = 10^(-3:-1), buffersize=1000)
-                        normaGrid$kernel <- "rbfkernel"
+                        normaGrid$kernel <- "rbfdot"
                         if (length(unique(y)) <= 1)
                             normaGrid$normaType <- "novelty"
                         else if (length(unique(y)) <= 2)
